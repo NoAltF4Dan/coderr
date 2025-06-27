@@ -1,77 +1,77 @@
 # Coderr Backend API
 
-Dies ist das Backend für die Plattform **Coderr**.
+This is the backend for the **Coderr** platform.
 
 ## 📌 Features
 
-- ✅ **Offers** (CRUD, Filter, Suche)
-- ✅ **Orders** (CRUD, rollenbasiert: Customer, Business, Admin)
-- ✅ **Reviews** (CRUD, 1 Review pro Business pro Customer)
-- ✅ **Base Info** (Plattformstatistik)
-- ✅ **TDD** (Tests für alle Endpunkte)
+- ✅ **Offers** (CRUD, filtering, search)
+- ✅ **Orders** (CRUD, role-based: Customer, Business, Admin)
+- ✅ **Reviews** (CRUD, 1 review per business per customer)
+- ✅ **Base Info** (platform statistics)
+- ✅ **TDD** (95%+ test coverage for all endpoints)
 
 ## ⚙️ Tech Stack
 
 - Django 4.x
 - Django REST Framework
 - Pytest (TDD)
-- PostgreSQL (oder SQLite lokal)
-- Pillow für ImageField
+- PostgreSQL (or SQLite locally)
+- Pillow for ImageField support
 
 ## 🚀 Setup (local)
 
-Repo klonen  
-git clone https://github.com/<dein_username>/<repo_name>.git  
+Clone the repository  
+git clone https://github.com/<your_username>/<repo_name>.git  
 cd <repo_name>
 
-Virtuelle Umgebung erstellen & aktivieren  
+Create and activate a virtual environment  
 python -m venv env  
 source env/bin/activate  # macOS/Linux  
-oder  
+or  
 env\Scripts\activate  # Windows
 
-Abhängigkeiten installieren  
+Install dependencies  
 pip install -r requirements.txt
 
-Datenbank Migrationen durchführen  
+Apply database migrations  
 python manage.py migrate
 
-Superuser erstellen (optional)  
+Create a superuser (optional)  
 python manage.py createsuperuser
 
-Server starten  
+Start the server  
 python manage.py runserver
 
-## ✅ Tests ausführen
+## ✅ Running Tests
 
-mit pytest  
+with pytest  
 pytest
 
-oder Django-Standard  
+or with Django’s test runner  
 python manage.py test
 
-## 📊 API Dokumentation (Swagger/OpenAPI)
+## 📊 API Documentation (Swagger/OpenAPI)
 
-Die API ist dokumentiert mit **drf-spectacular**.
+The API is documented using **drf-spectacular**.
 
-Swagger-UI:  
+Swagger UI:  
 http://127.0.0.1:8000/api/schema/swagger-ui/
 
-## 📎 Endpunkte (Auszug)
+## 📎 Endpoints (excerpt)
 
-| Endpoint | Beschreibung |
-|----------|---------------|
-| `/api/offers/` | Offers CRUD + Filter |
-| `/api/orders/` | Orders CRUD, rollenbasiert |
-| `/api/reviews/` | Reviews CRUD, 1 pro Business |
-| `/api/base-info/` | Plattformstatistik |
-| `/api/order-count/{business_user_id}/` | Zählt laufende Bestellungen |
-| `/api/completed-order-count/{business_user_id}/` | Zählt abgeschlossene Bestellungen |
+| Endpoint | Description |
+|----------|-------------|
+| `/api/offers/` | Offers CRUD + filtering |
+| `/api/orders/` | Orders CRUD, role-based |
+| `/api/reviews/` | Reviews CRUD, one per business |
+| `/api/base-info/` | Platform statistics |
+| `/api/order-count/{business_user_id}/` | Counts active orders |
+| `/api/completed-order-count/{business_user_id}/` | Counts completed orders |
 
 ## 🗂️ Environment
 
 - Python 3.10+
-- `.env` (optional): für DB, Secrets, usw.
+- .env (optional): for DB, secrets, etc. 
 
 ## 🧑‍💻 Author
 
