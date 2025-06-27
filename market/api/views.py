@@ -6,7 +6,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .models import Offer, Order, Review
+from ..models import Offer, Order, Review
 from .serializers import OfferSerializer, OrderSerializer, ReviewSerializer
 from .permissions import IsBusinessUser 
 

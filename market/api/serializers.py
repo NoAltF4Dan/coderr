@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Offer, OfferDetail, Order, Review
+from ..models import Offer, OfferDetail, Order, Review
 
 class OfferDetailSerializer(serializers.ModelSerializer):
     class Meta:
