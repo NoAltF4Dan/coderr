@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from users.models import CustomUser  
+from users.models import CustomUser
+
 
 class RegistrationSerializer(serializers.ModelSerializer):
     repeated_password = serializers.CharField(write_only=True)
@@ -8,7 +9,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ("username", "email", "password", "repeated_password", "type")
         extra_kwargs = {
-            'password': {'write_only': True},
+            "password": {"write_only": True},
         }
 
     def validate(self, data):

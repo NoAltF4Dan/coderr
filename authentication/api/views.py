@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
-from users.models import CustomUser  
 from .serializers import RegistrationSerializer
+
 
 class RegisterView(CreateAPIView):
     permission_classes = [AllowAny]
@@ -17,12 +17,15 @@ class RegisterView(CreateAPIView):
         if serializer.is_valid():
             user = serializer.save()
             token, _ = Token.objects.get_or_create(user=user)
-            return Response({
-                "token": token.key,
-                "username": user.username,
-                "email": user.email,
-                "user_id": user.id
-            }, status=status.HTTP_201_CREATED)
+            return Response(
+                {
+                    "token": token.key,
+                    "username": user.username,
+                    "email": user.email,
+                    "user_id": user.id
+                },
+                status=status.HTTP_201_CREATED
+            )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -41,14 +44,13 @@ class LoginView(APIView):
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        user = authenticate(request, username=username, password=password)
-        if not user:
-            return Response({"non_field_errors": ["Invalid credentials."]}, status=status.HTTP_400_BAD_REQUEST)
-
-        token, _ = Token.objects.get_or_create(user=user)
-        return Response({
-            "token": token.key,
-            "username": user.username,  
-            "email": user.email,
-            "user_id": user.id
-        }, status=status.HTTP_200_OK)
+        user = authenticate(username=username, password=password)
+        if user:
+            token, _ = Token.objects.get_or_create(user=user)
+            return Response({
+                "token": token.key,
+                "username": user.username,
+                "email": user.email,
+                "user_id": user.id
+            }, status=status.HTTP_200_OK)
+        return Response({"detail": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
