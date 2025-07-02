@@ -3,9 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.db.models import Avg
 
-from ..models import Offer, Order, Review
-from .serializers import OfferSerializer, OrderSerializer, ReviewSerializer
+from users.models import CustomUser
+from ..models import OfferDetail, Offer, Order, Review
+from .serializers import OfferDetailSerializer, OfferSerializer, OrderSerializer, ReviewSerializer
 from .permissions import (
     IsBusinessUser,
     IsAuthenticatedCustomer,
@@ -19,7 +21,20 @@ class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
     permission_classes = [IsBusinessUser]
+    
+    def get_permissions(self):
+        if self.action == 'list':
+            return [permissions.AllowAny()]
+        elif self.action == 'retrieve':
+            return [permissions.IsAuthenticated()]
+        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsBusinessUser()]
+        return super().get_permissions()
 
+class OfferDetailViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = OfferDetail.objects.all()
+    serializer_class = OfferDetailSerializer
+    permission_classes = [permissions.AllowAny]
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -39,6 +54,14 @@ class OrderViewSet(viewsets.ModelViewSet):
         return Order.objects.filter(
             models.Q(customer_user=user) | models.Q(business_user=user)
         )
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=False)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+
 
 
 class OrderCountView(APIView):
@@ -83,14 +106,21 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 
 class BaseInfoView(APIView):
+    permission_classes = [] 
+
     def get(self, request):
-        offer_count = Offer.objects.count()
-        order_count = Order.objects.count()
         review_count = Review.objects.count()
-        return Response(
-            {
-                "offer_count": offer_count,
-                "order_count": order_count,
-                "review_count": review_count,
-            }
-        )
+
+        average_rating = Review.objects.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+        average_rating = round(average_rating, 1)
+        business_profile_count = CustomUser.objects.filter(type='business').count()
+
+        offer_count = Offer.objects.count()
+
+        data = {
+            "review_count": review_count,
+            "average_rating": average_rating,
+            "business_profile_count": business_profile_count,
+            "offer_count": offer_count
+        }
+        return Response(data)
