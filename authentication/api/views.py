@@ -53,4 +53,4 @@ class LoginView(APIView):
                 "email": user.email,
                 "user_id": user.id
             }, status=status.HTTP_200_OK)
-        return Response({"detail": "Invalid credentials."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Ungültige Anfragedaten."}, status=status.HTTP_400_BAD_REQUEST)

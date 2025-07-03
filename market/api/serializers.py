@@ -1,5 +1,16 @@
 from rest_framework import serializers
+from django.db import models
 from ..models import Offer, OfferDetail, Order, Review
+
+class OfferDetailLinkSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OfferDetail
+        fields = ["id", "url"]
+
+    def get_url(self, obj):
+        return f"/api/offerdetails/{obj.id}/"
 
 class OfferDetailSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,24 +19,47 @@ class OfferDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "offer"]
 
 class OfferSerializer(serializers.ModelSerializer):
-    details = OfferDetailSerializer(many=True)
+    details = OfferDetailLinkSerializer(many=True, read_only=True)
+    details_data = OfferDetailSerializer(many=True, write_only=True)
+    min_price = serializers.SerializerMethodField()
+    min_delivery_time = serializers.SerializerMethodField()
+    user_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Offer
-        fields = "__all__"
+        fields = [
+            "id", "user", "title", "image", "description",
+            "created_at", "updated_at",
+            "details", "details_data",
+            "details", "min_price", "min_delivery_time", "user_details"
+        ]
         read_only_fields = ["id", "user"]
+
+    def get_min_price(self, obj):
+        return obj.details.aggregate(models.Min("price"))["price__min"]
+
+    def get_min_delivery_time(self, obj):
+        return obj.details.aggregate(models.Min("delivery_time_in_days"))["delivery_time_in_days__min"]
+
+    def get_user_details(self, obj):
+        return {
+            "first_name": obj.user.first_name or "",
+            "last_name": obj.user.last_name or "",
+            "username": obj.user.username
+        }
 
     def validate_details(self, value):
         if len(value) < 3:
             raise serializers.ValidationError("Ein Offer muss mindestens 3 Details enthalten.")
         return value
-    
+
     def create(self, validated_data):
-        details_data = validated_data.pop('details')
+        details_data = validated_data.pop("details_data", [])
         offer = Offer.objects.create(user=self.context['request'].user, **validated_data)
-        for detail_data in details_data:
-            OfferDetail.objects.create(offer=offer, **detail_data)
+        for detail in details_data:
+            OfferDetail.objects.create(offer=offer, **detail)
         return offer
+
     def update(self, instance, validated_data):
         details_data = validated_data.pop('details', None)
         instance.title = validated_data.get('title', instance.title)
@@ -46,6 +80,7 @@ class OfferSerializer(serializers.ModelSerializer):
                     offer_detail.save()
 
         return instance
+
 
 class OrderSerializer(serializers.ModelSerializer):
     offer_detail_id = serializers.IntegerField(write_only=True)

@@ -15,6 +15,7 @@ class ProfileSerializer(serializers.ModelSerializer):
             'tel',
             'description',
             'working_hours',
+            "created_at"
         ]
 
     def to_representation(self, instance):

@@ -7,11 +7,13 @@ class CustomUser(AbstractUser):
         ('business', 'Business'),
     ]
     type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default='customer')
-
     location = models.CharField(max_length=255, blank=True, null=True)
     tel = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     working_hours = models.CharField(max_length=255, blank=True, null=True)
+
+    profile_picture = models.ImageField(upload_to='profiles/', blank=True, null=True)  # NEU
+    created_at = models.DateTimeField(auto_now_add=True)  # NEU
 
     def __str__(self):
         return f"{self.username} ({self.type})"

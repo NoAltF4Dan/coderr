@@ -14,12 +14,16 @@ from .permissions import (
     IsAuthenticatedBusiness,
     IsReviewOwner,
 )
-
+from rest_framework.pagination import PageNumberPagination
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    
 User = get_user_model()
 
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
     serializer_class = OfferSerializer
+    pagination_class = StandardResultsSetPagination
     permission_classes = [IsBusinessUser]
     
     def get_permissions(self):

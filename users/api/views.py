@@ -6,9 +6,11 @@ from .serializers import ProfileSerializer
 from authentication.api.permissions import IsOwnerOrReadOnly
 
 class ProfileDetailView(generics.RetrieveUpdateAPIView):
-    queryset = CustomUser.objects.all()
     serializer_class = ProfileSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
     
 class BusinessProfileListView(generics.ListAPIView):
     queryset = CustomUser.objects.filter(type='business')
