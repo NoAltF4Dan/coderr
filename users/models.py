@@ -11,8 +11,7 @@ class CustomUser(AbstractUser):
     tel = models.CharField(max_length=50, blank=True, null=True)
     description = models.TextField(blank=True, null=True)
     working_hours = models.CharField(max_length=255, blank=True, null=True)
-
-    profile_picture = models.ImageField(upload_to='profiles/', blank=True, null=True)  # NEU
+    file = models.ImageField(upload_to="profile_pics/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)  # NEU
 
     def __str__(self):

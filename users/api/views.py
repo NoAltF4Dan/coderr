@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from users.models import CustomUser
-from .serializers import ProfileSerializer
+from .serializers import ProfileSerializer, CustomerProfileListSerializer
 from authentication.api.permissions import IsOwnerOrReadOnly
 
 class ProfileDetailView(generics.RetrieveUpdateAPIView):
@@ -18,7 +18,8 @@ class BusinessProfileListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
 class CustomerProfileListView(generics.ListAPIView):
-    queryset = CustomUser.objects.filter(type='customer')
-    serializer_class = ProfileSerializer
+    queryset = CustomUser.objects.filter(type="customer")
+    serializer_class = CustomerProfileListSerializer
     permission_classes = [IsAuthenticated]
+
 
