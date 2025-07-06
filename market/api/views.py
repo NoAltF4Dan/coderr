@@ -7,14 +7,25 @@ from django.db.models import Avg
 
 from users.models import CustomUser
 from ..models import OfferDetail, Offer, Order, Review
-from .serializers import OfferDetailSerializer, OfferSerializer, OrderSerializer, ReviewSerializer
+from .serializers import (
+    OfferDetailSerializer,
+    OfferSerializer,
+    OfferListSerializer,
+    OfferRetrieveSerializer,
+    OrderSerializer,
+    ReviewSerializer,
+)
 from .permissions import (
     IsBusinessUser,
     IsAuthenticatedCustomer,
     IsAuthenticatedBusiness,
     IsReviewOwner,
+    IsOfferOwner
 )
 from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters
+
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
     
@@ -22,27 +33,49 @@ User = get_user_model()
 
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
-    serializer_class = OfferSerializer
     pagination_class = StandardResultsSetPagination
-    permission_classes = [IsBusinessUser]
     
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        'user': ['exact'],
+        'details__price': ['gte', 'lte'],
+        'details__delivery_time_in_days': ['gte', 'lte'],
+    }
+    search_fields = ['title', 'description']
+    ordering_fields = ['updated_at', 'min_price', 'min_delivery_time']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return OfferListSerializer
+        elif self.action == 'retrieve':
+            return OfferRetrieveSerializer
+        return OfferSerializer
+
     def get_permissions(self):
         if self.action == 'list':
             return [permissions.AllowAny()]
         elif self.action == 'retrieve':
             return [permissions.IsAuthenticated()]
-        elif self.action in ['create', 'update', 'partial_update', 'destroy']:
+        elif self.action == 'create':
             return [IsBusinessUser()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            return [IsBusinessUser(), IsOfferOwner()]
         return super().get_permissions()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.distinct()
+
 
 class OfferDetailViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OfferDetail.objects.all()
     serializer_class = OfferDetailSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    pagination_class = None
 
     def get_permissions(self):
         if self.action == "create":
@@ -61,14 +94,14 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=False)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return super().create(request, *args, **kwargs)
-
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class OrderCountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def get(self, request, business_user_id):
         count = Order.objects.filter(
             business_user_id=business_user_id, status="in_progress"
@@ -77,6 +110,7 @@ class OrderCountView(APIView):
 
 
 class CompletedOrderCountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def get(self, request, business_user_id):
         count = Order.objects.filter(
             business_user_id=business_user_id, status="completed"
@@ -87,6 +121,7 @@ class CompletedOrderCountView(APIView):
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
+    pagination_class = None # Removed pagination to return a direct list
 
     def get_permissions(self):
         if self.action == "create":
