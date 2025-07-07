@@ -34,6 +34,9 @@ Install dependencies
 pip install -r requirements.txt
 
 Apply database migrations  
+python manage.py makemigrations
+* **Note for 'created_at' field:** 
+If you encounter a prompt asking for a one-off default value when adding the `created_at` field to `CustomUser`, type `django.utils.timezone.now` and press Enter.
 python manage.py migrate
 
 Create a superuser (optional)  
