@@ -3,7 +3,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.db.models import Avg
+from django.db.models import Avg, Min
+from django_filters.rest_framework import DjangoFilterBackend, FilterSet, NumberFilter
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.filters import SearchFilter, OrderingFilter
+from django.core.exceptions import ValidationError
 
 from users.models import CustomUser
 from ..models import OfferDetail, Offer, Order, Review
@@ -22,27 +26,56 @@ from .permissions import (
     IsReviewOwner,
     IsOfferOwner
 )
-from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters
 
+class OfferFilter(FilterSet):
+    min_price = NumberFilter(field_name="min_price_agg", lookup_expr="gte")
+    max_price = NumberFilter(field_name="min_price_agg", lookup_expr="lte")
+    min_delivery_time = NumberFilter(field_name="details__delivery_time_in_days", lookup_expr="gte")
+    max_delivery_time = NumberFilter(field_name="details__delivery_time_in_days", lookup_expr="lte")
+
+    class Meta:
+        model = Offer
+        fields = [
+            'user',
+            'min_price',
+            'max_price',
+            'min_delivery_time',
+            'max_delivery_time'
+        ]
+
+    @property
+    def qs(self):
+        # hier prüfen wir
+        errors = {}
+        params = self.data
+
+        for param in ['min_price', 'max_price', 'min_delivery_time', 'max_delivery_time']:
+            value = params.get(param)
+            if value is not None:
+                try:
+                    float(value)
+                except ValueError:
+                    errors[param] = f"{param} muss eine Zahl sein."
+        
+        if errors:
+            raise ValidationError(errors)
+
+        return super().qs
+        
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 10
-    
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
 User = get_user_model()
 
 class OfferViewSet(viewsets.ModelViewSet):
     queryset = Offer.objects.all()
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = OfferFilter
     pagination_class = StandardResultsSetPagination
-    
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = {
-        'user': ['exact'],
-        'details__price': ['gte', 'lte'],
-        'details__delivery_time_in_days': ['gte', 'lte'],
-    }
     search_fields = ['title', 'description']
-    ordering_fields = ['updated_at', 'min_price', 'min_delivery_time']
+    ordering_fields = ['updated_at']
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -63,9 +96,16 @@ class OfferViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        return queryset.distinct()
+        qs = Offer.objects.annotate(
+            min_price_agg=Min("details__price")
+        ).distinct()
 
+        # manuell über query params filtern
+        min_price = self.request.query_params.get("min_price")
+        if min_price is not None:
+            qs = qs.filter(min_price_agg__gte=min_price)
+
+        return qs
 
 class OfferDetailViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OfferDetail.objects.all()
@@ -99,7 +139,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
-
 class OrderCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request, business_user_id):
@@ -107,7 +146,6 @@ class OrderCountView(APIView):
             business_user_id=business_user_id, status="in_progress"
         ).count()
         return Response({"order_count": count}, status=status.HTTP_200_OK)
-
 
 class CompletedOrderCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -117,11 +155,10 @@ class CompletedOrderCountView(APIView):
         ).count()
         return Response({"completed_order_count": count}, status=status.HTTP_200_OK)
 
-
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-    pagination_class = None # Removed pagination to return a direct list
+    pagination_class = None
 
     def get_permissions(self):
         if self.action == "create":
@@ -143,17 +180,14 @@ class ReviewViewSet(viewsets.ModelViewSet):
             qs = qs.order_by(ordering)
         return qs
 
-
 class BaseInfoView(APIView):
-    permission_classes = [] 
+    permission_classes = []
 
     def get(self, request):
         review_count = Review.objects.count()
-
         average_rating = Review.objects.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
         average_rating = round(average_rating, 1)
         business_profile_count = CustomUser.objects.filter(type='business').count()
-
         offer_count = Offer.objects.count()
 
         data = {

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from ..models import CustomUser
+from market.models import Offer, OfferDetail, Order, Review
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = serializers.IntegerField(source="id", read_only=True)
@@ -30,7 +31,9 @@ class ProfileSerializer(serializers.ModelSerializer):
             "first_name", "last_name", "location",
             "tel", "description", "working_hours"
         ]
-        data.update({field: data.get(field) or "" for field in optional_fields})
+        for field in optional_fields:
+            if data.get(field) is None:
+                data[field] = ""
         return data
 
     def validate(self, data):
@@ -55,11 +58,23 @@ class BusinessProfileListOutputSerializer(serializers.ModelSerializer):
             "working_hours",
             "type"
         ]
-        read_only_fields = fields
+        read_only_fields = fields # All fields are read-only for output
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        optional_fields = [
+            "first_name", "last_name", "location",
+            "tel", "description", "working_hours"
+        ]
+        for field in optional_fields:
+            if data.get(field) is None:
+                data[field] = ""
+        return data
         
 class BusinessProfileListSerializer(serializers.ModelSerializer):
     user = serializers.IntegerField(source="id", read_only=True)
-
+    file = serializers.ImageField(required=False, allow_null=True)
+    
     class Meta:
         model = CustomUser
         fields = [
@@ -74,6 +89,7 @@ class BusinessProfileListSerializer(serializers.ModelSerializer):
             "working_hours",
             "type"
         ]
+        
 
 class CustomerProfileListSerializer(serializers.ModelSerializer):
     user = serializers.IntegerField(source="id", read_only=True)
