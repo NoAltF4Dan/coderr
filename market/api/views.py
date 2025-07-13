@@ -8,6 +8,8 @@ from django_filters.rest_framework import DjangoFilterBackend, FilterSet, Number
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.core.exceptions import ValidationError
+from rest_framework.exceptions import NotFound
+from django.shortcuts import get_object_or_404
 
 from users.models import CustomUser
 from ..models import OfferDetail, Offer, Order, Review
@@ -106,6 +108,16 @@ class OfferViewSet(viewsets.ModelViewSet):
             qs = qs.filter(min_price_agg__gte=min_price)
 
         return qs
+    
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        updated_instance = self.get_object()
+        full_serializer = OfferSerializer(updated_instance, context=self.get_serializer_context())  # ✅ korrekt
+        return Response(full_serializer.data, status=status.HTTP_200_OK)
+
 
 class OfferDetailViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OfferDetail.objects.all()
@@ -141,15 +153,24 @@ class OrderViewSet(viewsets.ModelViewSet):
 
 class OrderCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request, business_user_id):
+        if not CustomUser.objects.filter(id=business_user_id, type="business").exists():
+            raise NotFound("Kein Geschäftsnutzer mit der angegebenen ID gefunden.")
+
         count = Order.objects.filter(
             business_user_id=business_user_id, status="in_progress"
         ).count()
         return Response({"order_count": count}, status=status.HTTP_200_OK)
 
+
 class CompletedOrderCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request, business_user_id):
+        if not CustomUser.objects.filter(id=business_user_id, type="business").exists():
+            raise NotFound("Kein Geschäftsnutzer mit der angegebenen ID gefunden.")
+
         count = Order.objects.filter(
             business_user_id=business_user_id, status="completed"
         ).count()

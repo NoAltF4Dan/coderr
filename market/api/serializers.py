@@ -115,7 +115,7 @@ class OfferSerializer(serializers.ModelSerializer):
             "min_price", "min_delivery_time", "user_details"
         ]
         read_only_fields = ["id", "user", "created_at", "updated_at"]
-
+        
     def get_min_price(self, obj):
         min_price_value = obj.details.aggregate(models.Min("price"))["price__min"]
         return int(min_price_value) if min_price_value is not None else 0
@@ -132,8 +132,15 @@ class OfferSerializer(serializers.ModelSerializer):
         }
 
     def validate_details(self, value):
-        if len(value) < 3:
-            raise serializers.ValidationError("Ein Offer muss mindestens 3 Details enthalten.")
+        request = self.context.get("request")
+        if request and request.method == "PATCH":
+            for i, detail in enumerate(value):
+                required_fields = ["title", "revisions", "delivery_time_in_days", "price", "features", "offer_type"]
+                missing = [field for field in required_fields if field not in detail]
+                if missing:
+                    raise serializers.ValidationError({
+                        f"details[{i}]": [f"Fehlende Felder: {', '.join(missing)}"]
+                    })
         return value
 
     def create(self, validated_data):
@@ -145,25 +152,53 @@ class OfferSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         details_data = validated_data.pop("details", None)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
         if details_data is not None:
-            existing_details = {detail.id: detail for detail in instance.details.all()}
+            for i, detail_data in enumerate(details_data):
+                offer_type = detail_data.get("offer_type")
+                if not offer_type:
+                    raise serializers.ValidationError({
+                        f"details[{i}]": "Feld 'offer_type' ist erforderlich, um das zugehörige Detail zu finden."
+                    })
 
-            for detail_data in details_data:
-                detail_id = detail_data.get('id')
-                if detail_id in existing_details:
-                    detail_instance = existing_details[detail_id]
-                    for attr, value in detail_data.items():
-                        setattr(detail_instance, attr, value)
-                    detail_instance.save()
-                else:
-                    raise serializers.ValidationError(
-                        {"details": f"OfferDetail with ID {detail_id} not found or new detail without ID provided for update."}
-                    )
+                try:
+                    detail_instance = instance.details.get(offer_type=offer_type)
+                except OfferDetail.DoesNotExist:
+                    raise serializers.ValidationError({
+                        f"details[{i}]": f"Kein OfferDetail mit offer_type '{offer_type}' vorhanden."
+                    })
+
+                detail_serializer = OfferDetailSerializer(
+                    detail_instance,
+                    data=detail_data,
+                    context=self.context,
+                    partial=False  # ⬅️ erzwingt vollständige Angabe!
+                )
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+
         return instance
+
+
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        request = self.context.get("request", None)
+
+        # Nur bei PATCH mit Eingabedaten aktivieren
+        if request and request.method == "PATCH" and hasattr(self, "initial_data"):
+            details_data = self.initial_data.get("details")
+
+            if details_data is not None:
+                details_field = self.fields.get("details")
+                if details_field and hasattr(details_field, "child"):
+                    for child_field in details_field.child.fields.values():
+                        child_field.required = True
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -180,12 +215,36 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "customer_user", "business_user", "title", "revisions",
             "delivery_time_in_days", "price", "features", "offer_type",
-            "status", "created_at", "updated_at"
+            "created_at", "updated_at"
         ]
 
     def get_price(self, obj):
         return int(obj.price)
+    
+    def to_internal_value(self, data):
+        allowed = set(self.fields.keys())
+        received = set(data.keys())
 
+        unknown = received - allowed
+        if unknown:
+            raise serializers.ValidationError({
+                "non_field_errors": [f"Unerlaubte Felder in Anfrage: {', '.join(unknown)}"]
+            })
+
+        return super().to_internal_value(data)
+    
+    def validate_status(self, value):
+        user = self.context['request'].user
+
+        if user.type != "business":
+            raise serializers.ValidationError("Nur Business-User dürfen den Status ändern.")
+
+        valid_statuses = [choice[0] for choice in Order._meta.get_field('status').choices]
+        if value not in valid_statuses:
+            raise serializers.ValidationError(f"Ungültiger Status: '{value}'. Zulässig sind: {', '.join(valid_statuses)}.")
+
+        return value
+    
     def create(self, validated_data):
         offer_detail_id = validated_data.pop("offer_detail_id", None)
         if not offer_detail_id:
